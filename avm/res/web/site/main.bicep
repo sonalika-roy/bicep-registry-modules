@@ -151,6 +151,28 @@ param hostNameSslStates array?
 @description('Optional. Hyper-V sandbox.')
 param hyperV bool = false
 
+@description('Optional. The deployment storage type for the function app.')
+param deploymentStorageType string = 'blobContainer'
+
+@description('Optional. The resource ID of the storage account to be used for deployment.')
+param storageAccountResourceId string
+
+@description('Optional. The name of the deployment storage container.')
+param deploymentStorageContainerName string
+
+@description('Optional. Maximum instance count for scaling the function app.')
+param maximumInstanceCount int = 10
+
+@description('Optional. The memory in MB for each instance of the function app.')
+param instanceMemoryMB int = 2048
+
+@description('Optional. The name of the runtime for the function app (e.g., dotnet, node).')
+param functionAppRuntime string = 'dotnet'
+
+@description('Optional. The version of the function app runtime.')
+param functionAppRuntimeVersion string = '6.0'
+
+
 @description('Optional. Site redundancy mode.')
 @allowed([
   'ActiveActive'
@@ -226,6 +248,26 @@ var formattedRoleAssignments = [
   })
 ]
 
+param flexFunctionConfig = {
+      deployment: {
+        storage: {
+          type: 'blobContainer'
+          value: '${storageAccountResourceId}/blobServices/default/containers/${deploymentStorageContainerName}'
+          authentication: {
+            type: 'SystemAssignedIdentity'
+          }
+        }
+      }
+      scaleAndConcurrency: {
+        maximumInstanceCount: maximumInstanceCount
+        instanceMemoryMB: instanceMemoryMB
+      }
+      runtime: { 
+        name: functionAppRuntime
+        version: functionAppRuntimeVersion
+      }
+    }
+
 #disable-next-line no-deployments-resources
 resource avmTelemetry 'Microsoft.Resources/deployments@2024-03-01' = if (enableTelemetry) {
   name: '46d3xbcp.res.web-site.${replace('-..--..-', '.', '-')}.${substring(uniqueString(deployment().name, location), 0, 4)}'
@@ -263,6 +305,7 @@ resource app 'Microsoft.Web/sites@2023-12-01' = {
       : null
     storageAccountRequired: storageAccountRequired
     keyVaultReferenceIdentity: keyVaultAccessIdentityResourceId
+    functionAppConfig: !empty(flexFunctionConfig) ? flexFunctionConfig : null
     virtualNetworkSubnetId: virtualNetworkSubnetId
     siteConfig: siteConfig
     clientCertEnabled: clientCertEnabled
